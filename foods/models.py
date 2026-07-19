@@ -1,5 +1,6 @@
 from django.db import models
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator
+from django.core.exceptions import ValidationError
 
 class FoodCategory(models.Model):
     DIET_TYPES = [
@@ -34,54 +35,58 @@ class Food(models.Model):
     ]
     
     name = models.CharField(max_length=200, verbose_name="نام غذا")
-    category = models.ForeignKey(FoodCategory, on_delete=models.CASCADE, related_name='foods')
-    meal_type = models.CharField(max_length=20, choices=MEAL_TYPES, default='lunch')
+    category = models.ForeignKey(FoodCategory, on_delete=models.PROTECT, related_name='foods')
+    meal_type = models.CharField(max_length=20, choices=MEAL_TYPES, default='lunch', db_index=True)
     
     description = models.TextField(verbose_name="توضیحات")
     ingredients = models.TextField(verbose_name="مواد اولیه", help_text="مواد تشکیل دهنده با جزئیات")
     allergens = models.CharField(max_length=300, blank=True, help_text="مواد حساسیت‌زا (مثل: شیر، تخم‌مرغ، گندم، مغزها)")
     
-    # اطلاعات تغذیه‌ای (در هر وعده)
-    calories = models.IntegerField(help_text="کالری", validators=[MinValueValidator(0)])
-    protein = models.DecimalField(max_digits=5, decimal_places=1, help_text="پروتئین (گرم)")
-    carbs = models.DecimalField(max_digits=5, decimal_places=1, help_text="کربوهیدرات (گرم)")
-    fat = models.DecimalField(max_digits=5, decimal_places=1, help_text="چربی (گرم)")
-    fiber = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True, help_text="فیبر (گرم)")
-    sugar = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True, help_text="قند (گرم)")
-    sodium = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True, help_text="سدیم (میلی‌گرم)")
+    weight_in_grams = models.PositiveIntegerField(default=250, help_text="وزن تقریبی پرس (گرم)")
+    calories = models.PositiveIntegerField(help_text="کالری")
     
-    # اطلاعات فروش
-    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name="قیمت (تومان)")
-    discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, verbose_name="قیمت با تخفیف")
-    preparation_time = models.IntegerField(default=20, help_text="زمان آماده‌سازی (دقیقه)")
-    is_available = models.BooleanField(default=True, verbose_name="موجود")
-    is_featured = models.BooleanField(default=False, verbose_name="ویژه")
+    protein = models.DecimalField(max_digits=5, decimal_places=1, validators=[MinValueValidator(0)])
+    carbs = models.DecimalField(max_digits=5, decimal_places=1, validators=[MinValueValidator(0)])
+    fat = models.DecimalField(max_digits=5, decimal_places=1, validators=[MinValueValidator(0)])
+    fiber = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    sugar = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
+    sodium = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     
-    # تصاویر
+    price = models.DecimalField(max_digits=10, decimal_places=2, validators=[MinValueValidator(0)], verbose_name="قیمت (تومان)")
+    discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, validators=[MinValueValidator(0)], verbose_name="قیمت با تخفیف")
+    preparation_time = models.PositiveIntegerField(default=20, help_text="زمان آماده‌سازی (دقیقه)")
+    
+    is_available = models.BooleanField(default=True, verbose_name="موجود", db_index=True)
+    is_featured = models.BooleanField(default=False, verbose_name="ویژه", db_index=True)
+    
     image = models.ImageField(upload_to='foods/', verbose_name="تصویر اصلی", null=True, blank=True)
     thumbnail = models.ImageField(upload_to='foods/thumbnails/', null=True, blank=True)
     
-    # آمار
-    order_count = models.IntegerField(default=0, help_text="تعداد دفعات سفارش")
-    average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0)
+    order_count = models.PositiveIntegerField(default=0)
+    average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0, validators=[MinValueValidator(0)])
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
+    def clean(self):
+        super().clean()
+        if self.discount_price and self.discount_price >= self.price:
+            raise ValidationError({'discount_price': 'قیمت با تخفیف باید کمتر از قیمت اصلی باشد.'})
+
     @property
     def final_price(self):
-        """قیمت نهایی با احتساب تخفیف"""
         return self.discount_price if self.discount_price else self.price
     
     @property
     def calories_per_gram(self):
-        """کالری به ازای هر گرم (تقریبی)"""
-        return self.calories / 250  # فرض وزن تقریبی 250 گرم
+        if self.weight_in_grams > 0:
+            return round(self.calories / self.weight_in_grams, 2)
+        return 0
     
     def __str__(self):
-        return f"{self.name} - {self.calories} کالری - {self.final_price} تومان"
+        return f"{self.name} - {self.final_price} تومان"
     
     class Meta:
         verbose_name = "غذا"
         verbose_name_plural = "غذاها"
-        ordering = ['-order_count', '-created_at']
+        ordering = ['-is_available', '-order_count']

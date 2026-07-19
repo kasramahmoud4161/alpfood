@@ -17,9 +17,9 @@ RUN apt-get update \
 COPY requirements.txt /app/
 
 # تغییر طلایی: استفاده از سرورهای قدرتمند ایران‌سرور برای دانلود بدون نیاز به فیلترشکن
-# استفاده از سرورهای قدرتمند علی‌بابا (بدون مشکل تحریم)
-RUN pip install --upgrade pip -i https://mirrors.aliyun.com/pypi/simple/
-RUN pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
+# استفاده از 
+# در فایل Dockerfile
+RUN pip install --default-timeout=1000 --retries=10 -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/
 
 # کپی کردن کل کدهای پروژه به داخل داکر
 COPY . /app/

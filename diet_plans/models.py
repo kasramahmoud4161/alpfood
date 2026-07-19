@@ -7,7 +7,7 @@ class WeeklyPlan(models.Model):
     week_start_date = models.DateField()
     week_end_date = models.DateField()
     created_at = models.DateTimeField(auto_now_add=True)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True, db_index=True) # ایندکس برای جستجوی سریع برنامه فعال
     
     def __str__(self):
         return f"Weekly plan for {self.user.phone} - {self.week_start_date}"
@@ -17,30 +17,27 @@ class WeeklyPlan(models.Model):
 
 class DailyMealPlan(models.Model):
     DAYS_OF_WEEK = [
-        (0, 'دوشنبه'),
-        (1, 'سه‌شنبه'),
-        (2, 'چهارشنبه'),
-        (3, 'پنج‌شنبه'),
-        (4, 'جمعه'),
-        (5, 'شنبه'),
-        (6, 'یکشنبه'),
+        (0, 'دوشنبه'), (1, 'سه‌شنبه'), (2, 'چهارشنبه'), 
+        (3, 'پنج‌شنبه'), (4, 'جمعه'), (5, 'شنبه'), (6, 'یکشنبه'),
     ]
     
     MEAL_TYPES = [
-        ('breakfast', 'صبحانه'),
-        ('lunch', 'ناهار'),
-        ('dinner', 'شام'),
-        ('snack', 'میان وعده'),
+        ('breakfast', 'صبحانه'), ('lunch', 'ناهار'),
+        ('dinner', 'شام'), ('snack', 'میان وعده'),
     ]
     
     weekly_plan = models.ForeignKey(WeeklyPlan, on_delete=models.CASCADE, related_name='daily_plans')
     day_of_week = models.IntegerField(choices=DAYS_OF_WEEK)
     meal_type = models.CharField(max_length=20, choices=MEAL_TYPES)
-    food = models.ForeignKey(Food, on_delete=models.CASCADE)
-    date = models.DateField()
+    
+    # تغییر حیاتی: اگر غذا پاک شد، برنامه کاربر حفظ شود
+    food = models.ForeignKey(Food, on_delete=models.SET_NULL, null=True, related_name='planned_meals')
+    
+    date = models.DateField(db_index=True) # ایندکس برای کوئری گرفتن غذاهای "امروز"
     
     class Meta:
         unique_together = ['weekly_plan', 'day_of_week', 'meal_type']
     
     def __str__(self):
-        return f"{self.get_day_of_week_display()} - {self.get_meal_type_display()}: {self.food.name}"
+        food_name = self.food.name if self.food else "غذای حذف شده"
+        return f"{self.get_day_of_week_display()} - {self.get_meal_type_display()}: {food_name}"

@@ -45,6 +45,7 @@ LOCAL_APPS = [
     'notifications',
     'reviews',
     'subscriptions',
+    'trainers',
 ]
 # ترکیب تمام اپلیکیشن‌ها (این خط حتماً باید پایین‌تر از سه متغیر بالا باشد)
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -131,3 +132,16 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+
+
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1), # اعتبار توکن اصلی یک روز
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7), # اعتبار توکن رفرش یک هفته
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}

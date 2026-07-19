@@ -1,27 +1,19 @@
 from django.db import models
-from django.utils import timezone
+from orders.models import Order
 
-class Coupon(models.Model):
-    code = models.CharField(max_length=50, unique=True)
-    discount_percent = models.IntegerField(help_text="درصد تخفیف")
-    valid_from = models.DateTimeField()
-    valid_to = models.DateTimeField()
-    max_uses = models.IntegerField(default=1)
-    used_count = models.IntegerField(default=0)
-    is_active = models.BooleanField(default=True)
+class Payment(models.Model):
+    order = models.OneToOneField(Order, on_delete=models.PROTECT, related_name='payment')
+    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name="مبلغ تراکنش (تومان)")
+    authority = models.CharField(max_length=100, unique=True, null=True, blank=True, verbose_name="کد ارجاع زرین‌پال")
+    ref_id = models.CharField(max_length=100, null=True, blank=True, verbose_name="کد پیگیری پرداخت")
+    is_paid = models.BooleanField(default=False, db_index=True)
     
-    @property
-    def is_valid(self):
-        now = timezone.now()
-        return (self.is_active and 
-                self.valid_from <= now <= self.valid_to and 
-                self.used_count < self.max_uses)
-    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
     def __str__(self):
-        return f"{self.code} - {self.discount_percent}%"
-
-class UsedCoupon(models.Model):
-    user = models.ForeignKey('accounts.User', on_delete=models.CASCADE)
-    coupon = models.ForeignKey(Coupon, on_delete=models.CASCADE)
-    order = models.ForeignKey('orders.Order', on_delete=models.CASCADE)
-    used_at = models.DateTimeField(auto_now_add=True)
+        return f"تراکنش {self.order.order_number} - {'موفق' if self.is_paid else 'ناموفق'}"
+        
+    class Meta:
+        verbose_name = "تراکنش"
+        verbose_name_plural = "تراکنش‌ها"
